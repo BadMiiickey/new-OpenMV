@@ -1,4 +1,4 @@
-from pyb import Pin, Timer
+from pyb import Pin, Timer #type:ignore
 
 class TurbineHelper:
     inverseLeft = False
@@ -15,8 +15,8 @@ class TurbineHelper:
     period = tim.period()
 
     def __init__(self, inverseLeft = False, inverseRight = False):
-        self.inverseLeft = inverseLeft
-        self.inverseRight = inverseRight
+        TurbineHelper.inverseLeft = inverseLeft
+        TurbineHelper.inverseRight = inverseRight
 
         #高低电平初始化
         self.ain1.low()
@@ -56,3 +56,4 @@ class TurbineHelper:
         #计算右轮PWM脉冲宽度
         rightPulseWith = int(abs(rightSpeed) * TurbineHelper.period / 100)
         TurbineHelper.ch2.pulse_width(rightPulseWith)
+6

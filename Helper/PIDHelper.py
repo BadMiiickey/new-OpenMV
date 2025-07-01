@@ -1,4 +1,4 @@
-from pyb import millis
+from pyb import millis #type:ignore
 from math import pi, isnan
 
 class PIDHelper:

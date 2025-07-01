@@ -5,7 +5,7 @@ import Helper.MVHelper as MVHelper
 import Helper.PIDHelper as PIDHelper
 import Helper.TimeHelper as TimeHelper
 import Helper.TurbineHelper as TurbineHelper
-import sensor, time, pyb, tf, uos, gc, math
+import sensor, time, pyb, tf, uos, gc, math #type:ignore
 
 from Helper.AssistantHelper import AssistantHelper
 from Helper.ColorsHelper import ColorsHelper
@@ -14,11 +14,10 @@ from Helper.MVHelper import MVHelper
 from Helper.PIDHelper import PIDHelper
 from Helper.TimeHelper import TimeHelper
 from Helper.TurbineHelper import TurbineHelper
-from pyb import UART
+from pyb import UART #type:ignore
 
 try:
-    # load the model, alloc the model file on the heap if we have at least 64K free after loading
-    net = tf.load("trained.tflite", load_to_fb = uos.stat('trained.tflite')[6] > (gc.mem_free() - (64 * 1024)))
+    net = tf.load("trained.tflite", load_to_fb = uos.stat('trained.tflite')[6] > (gc.mem_free() - (64 * 1024))) #type:ignore
 except Exception as e:
     raise Exception('Failed to load "trained.tflite", did you copy the .tflite and labels.txt file onto the mass-storage device? (' + str(e) + ')')
 
@@ -28,6 +27,7 @@ except Exception as e:
     raise Exception('Failed to load "labels.txt", did you copy the .tflite and labels.txt file onto the mass-storage device? (' + str(e) + ')')
 
 #涡轮初始化
+TurbineHelper(inverseLeft = False, inverseRight = False)
 TurbineHelper.run(7.5, 7.5)
 time.sleep(3)
 TurbineHelper.run(8.5, 8.5)
@@ -35,9 +35,8 @@ time.sleep(3)
 
 #OpenMV初始化
 MVHelper.mvInit()
-MVHelper.autoDetectEnvironment()
 
-clock = time.clock()
+clock = time.clock() #type:ignore
 uart3 = UART(3, 115200)
 uart3.init(115200, 8, None, 1)
 
@@ -49,8 +48,8 @@ blackThreshold = ColorsHelper().blackThreshold
 
 sizeThreshold = 10000
 
-xPid = PIDHelper(kp = 1, ki = 1, kd = 0, imax = 100)
-hPid = PIDHelper(kp = 0.01, ki = 0.01, kd = 0, imax = 100)
+xPid = PIDHelper(1, 1, 0, 100)
+hPid = PIDHelper(0.01, 0.01, 0, 100)
 detectionHelper = DetectionHelper(0)
 lastTime = 0
 movementSequenceEnabled = False
@@ -60,10 +59,9 @@ while(True):
     clock.tick()
     img = sensor.snapshot()
     maxSize = 0
-    minConfidence = 0.97
+    minConfidence = 0.8 if (MVHelper.flagFind == 3) else 0.97
 
-    if (MVHelper.flagFind == 3): 
-        minConfidence = 0.8
+    MVHelper.renderCurrentTargetString()
 
     for keyIndex, valueList in enumerate(net.detect(img, thresholds = [(math.ceil(minConfidence * 255), 255)])):
         if (keyIndex == 0): continue
@@ -77,8 +75,8 @@ while(True):
 
         for value in valueList:
             myBlob = value.rect()
-            centerX = math.floor(myBlob[0] + myBlob[2] / 2)
-            centerY = math.floor(myBlob[1] + myBlob[3] / 2)
+            centerX = math.floor(myBlob.x() + myBlob.w() / 2) #type:ignore
+            centerY = math.floor(myBlob.y() + myBlob.h() / 2) #type:ignore
 
             img.draw_circle((centerX, centerY, 12), color = circleColors[keyIndex], thickness = 2)
             
@@ -107,7 +105,7 @@ while(True):
             if (not movementSequenceEnabled): continue
 
             TurbineHelper.run(7.4, 7.4)
-            time.sleep_ms(5000)
+            time.sleep_ms(5000) #type:ignore
             TimeHelper.delayWithStartAction(8000, lambda: TurbineHelper.run(8.5, 8.5))
             movementSequenceEnabled = False
 
@@ -135,11 +133,11 @@ while(True):
         continue
 
     #忽略过小目标
-    if (MVHelper.maxBlob[2] * MVHelper.maxBlob[3] <= 100): continue
+    if (MVHelper.maxBlob.w() * MVHelper.maxBlob.h() <= 100): continue #type:ignore
 
     #自动控制逻辑
-    xError = math.floor(MVHelper.maxBlob[0] + MVHelper.maxBlob[2] / 2 - img.width() / 2)
-    hError = MVHelper.maxBlob[2] * MVHelper.maxBlob[3] - sizeThreshold
+    xError = math.floor(MVHelper.maxBlob[0] + MVHelper.maxBlob.w() / 2 - img.width() / 2) #type:ignore
+    hError = MVHelper.maxBlob.w() * MVHelper.maxBlob.h() - sizeThreshold #type:ignore
     xOutput = xPid.getPid(xError, 1)
     hOutput = hPid.getPid(hError, 1)
     leftOut = min(500, -xOutput - hOutput)

@@ -1,4 +1,4 @@
-import pyb
+import pyb #type:ignore
 
 class TimeHelper:
 

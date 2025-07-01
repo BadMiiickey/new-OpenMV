@@ -1,10 +1,12 @@
-import sensor, time
+import Helper.DetectionHelper as DetectionHelper
+import sensor, time #type:ignore
 
-from image import Image
+from Helper.DetectionHelper import DetectionHelper
+from image import Image #type:ignore
 
 class MVHelper:
     flagFind = 1
-    maxBlob = [0, 0, 0, 0]  # 应该是 [x, y, width, height]
+    maxBlob = [0, 0, 0, 0, 0, 0, 0, 0] #[x, y, w, h, pixels, cx, cy, rotation]
     maxSize = 0
     neededCheckTimes = 3
 
@@ -20,28 +22,8 @@ class MVHelper:
         sensor.set_pixformat(sensor.RGB565)
         sensor.set_framesize(sensor.QVGA)
         sensor.skip_frames(10)
-
-    #自动检测环境并初始化摄像头
-    @staticmethod
-    def autoDetectEnvironment():
-        MVHelper.mvInit()
-
-        #默认室外环境
         sensor.set_auto_whitebal(False)
         sensor.set_auto_gain(False)
-        sensor.set_auto_exposure(False, exposure_us = 2500)
-
-        totalBrightness = 0
-        samples = 5
-
-        for sample in range(samples):
-            img = sensor.snapshot()
-            totalBrightness += img.get_statistics().mean()
-            time.sleep_ms(100)
-        
-        averageBrightness = totalBrightness / samples
-
-        return MVHelper(False, False, False, 2500) if averageBrightness > 120 else MVHelper(True, True, True, 4000)
 
     #设置摄像头曝光状态
     @staticmethod
@@ -60,15 +42,21 @@ class MVHelper:
             cls.maxSize = 0
             cls.flagFind += 1
 
-            if cls.flagFind >= 4:
-                cls.flagFind = 1
-            
-            myCount = 0
+        if (cls.flagFind >= 4):
+            cls.flagFind = 1
 
-        blobSize = myBlob[2] * myBlob[3]
-
-        if (blobSize > cls.maxSize):
+        if (myBlob.w() * myBlob.h() > cls.maxSize): #type:ignore
             cls.maxBlob = myBlob
-            cls.maxSize = blobSize
+            cls.maxSize = myBlob[2] * myBlob[3]
 
         return myCount
+    
+    @staticmethod
+    def renderCurrentTargetString():
+        for keyIndex in range(0, 4):
+            key = (keyIndex, MVHelper.flagFind)
+
+            if key in DetectionHelper.detectionMap:
+                targetType = DetectionHelper.detectionMap[key]
+
+                img.draw_string(10, 10, targetType + '!') #type:ignore
