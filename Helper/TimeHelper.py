@@ -2,13 +2,15 @@ import pyb #type:ignore
 
 class TimeHelper:
 
+    #获取当前时间
     @staticmethod
     def getCurrentTime():
         return pyb.millis()
     
-    @staticmethod
-    def delayWithStartAction(durationMs: int, action):
-        startTime = TimeHelper.getCurrentTime()
+    #延时函数, 在指定的毫秒数内执行指定的函数
+    @classmethod
+    def delayWithStartAction(cls, durationMs: int, action):
+        startTime = cls.getCurrentTime()
 
-        while (TimeHelper.getCurrentTime() - startTime < durationMs):
+        while (cls.getCurrentTime() - startTime < durationMs):
             action()

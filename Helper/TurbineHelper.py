@@ -28,32 +28,32 @@ class TurbineHelper:
         self.ch1.pulse_width_percent(0)
         self.ch2.pulse_width_percent(0)
 
-    @staticmethod
-    def run(leftSpeed: float | int, rightSpeed: float | int):
-        leftSpeed = -leftSpeed if TurbineHelper.inverseLeft else leftSpeed
-        rightSpeed = -rightSpeed if TurbineHelper.inverseRight else rightSpeed
+    #设置舵机左右电机的速度
+    @classmethod
+    def run(cls, leftSpeed: float | int, rightSpeed: float | int):
+        leftSpeed = -leftSpeed if cls.inverseLeft else leftSpeed
+        rightSpeed = -rightSpeed if cls.inverseRight else rightSpeed
 
         #设置左侧电机高低电平
         if leftSpeed < 0:
-            TurbineHelper.ain1.low()
-            TurbineHelper.ain2.high()
+            cls.ain1.low()
+            cls.ain2.high()
         else:
-            TurbineHelper.ain1.high()
-            TurbineHelper.ain2.low()
+            cls.ain1.high()
+            cls.ain2.low()
 
         #设置右侧电机高低电平
         if rightSpeed < 0:
-            TurbineHelper.bin1.low()
-            TurbineHelper.bin2.high()
+            cls.bin1.low()
+            cls.bin2.high()
         else:
-            TurbineHelper.bin1.high()
-            TurbineHelper.bin2.low()
+            cls.bin1.high()
+            cls.bin2.low()
 
         #计算左轮PWM脉冲宽度
-        leftPulseWith = int(abs(leftSpeed) * TurbineHelper.period / 100)
-        TurbineHelper.ch1.pulse_width(leftPulseWith)
+        leftPulseWith = int(abs(leftSpeed) * cls.period / 100)
+        cls.ch1.pulse_width(leftPulseWith)
 
         #计算右轮PWM脉冲宽度
-        rightPulseWith = int(abs(rightSpeed) * TurbineHelper.period / 100)
-        TurbineHelper.ch2.pulse_width(rightPulseWith)
-6
+        rightPulseWith = int(abs(rightSpeed) * cls.period / 100)
+        cls.ch2.pulse_width(rightPulseWith)

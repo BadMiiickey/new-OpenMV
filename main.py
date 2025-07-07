@@ -1,30 +1,23 @@
-import Helper.AssistantHelper as AssistantHelper
-import Helper.ColorsHelper as ColorsHelper
-import Helper.DetectionHelper as DetectionHelper
-import Helper.MVHelper as MVHelper
-import Helper.PIDHelper as PIDHelper
-import Helper.TimeHelper as TimeHelper
-import Helper.TurbineHelper as TurbineHelper
-import sensor, time, pyb, tf, uos, gc, math #type:ignore
+import sensor, time, tf, uos, gc, math #type:ignore
 
 from Helper.AssistantHelper import AssistantHelper
+from Helper.BlobHelper import BlobHelper
 from Helper.ColorsHelper import ColorsHelper
 from Helper.DetectionHelper import DetectionHelper
 from Helper.MVHelper import MVHelper
 from Helper.PIDHelper import PIDHelper
 from Helper.TimeHelper import TimeHelper
 from Helper.TurbineHelper import TurbineHelper
-from pyb import UART #type:ignore
 
 try:
     net = tf.load("trained.tflite", load_to_fb = uos.stat('trained.tflite')[6] > (gc.mem_free() - (64 * 1024))) #type:ignore
 except Exception as e:
-    raise Exception('Failed to load "trained.tflite", did you copy the .tflite and labels.txt file onto the mass-storage device? (' + str(e) + ')')
+    raise Exception('Failed to load "trained.tflite" (' + str(e) + ')')
 
 try:
     labels = [line.rstrip('\n') for line in open("labels.txt")]
 except Exception as e:
-    raise Exception('Failed to load "labels.txt", did you copy the .tflite and labels.txt file onto the mass-storage device? (' + str(e) + ')')
+    raise Exception('Failed to load "labels.txt" (' + str(e) + ')')
 
 #涡轮初始化
 TurbineHelper(inverseLeft = False, inverseRight = False)
@@ -36,34 +29,31 @@ time.sleep(3)
 #OpenMV初始化
 MVHelper.mvInit()
 
-clock = time.clock() #type:ignore
-uart3 = UART(3, 115200)
-uart3.init(115200, 8, None, 1)
-
-#颜色阈值导入
-circleColors = ColorsHelper().circleColors
-redThreshold = ColorsHelper().redThreshold
-yellowThreshold = ColorsHelper().yellowThreshold
-blackThreshold = ColorsHelper().blackThreshold
-
-sizeThreshold = 10000
-
+#PID初始化
 xPid = PIDHelper(1, 1, 0, 100)
 hPid = PIDHelper(0.01, 0.01, 0, 100)
-detectionHelper = DetectionHelper(0)
-lastTime = 0
-movementSequenceEnabled = False
-isAutoControl = True
 
+#其余变量初始化
+lastTime = 0
+movementSequenceEnabled = False #是否允许执行移动
+isAutoControl = True #是否自动控制
+
+#循环执行部分
 while(True):
-    clock.tick()
-    img = sensor.snapshot()
-    maxSize = 0
+    MVHelper.clock
+    MVHelper.maxSize = 0
+    image = sensor.snapshot()
     minConfidence = 0.8 if (MVHelper.flagFind == 3) else 0.97
 
-    MVHelper.renderCurrentTargetString()
+    #渲染当前目标信息
+    MVHelper.renderCurrentTargetString(image)
+    MVHelper.renderCurrentTargetCount(image, DetectionHelper.detectCount)
 
-    for keyIndex, valueList in enumerate(net.detect(img, thresholds = [(math.ceil(minConfidence * 255), 255)])):
+    #渲染当前识别出的最大圆
+    MVHelper.validateCircle(image)
+
+    #检测目标是否存在
+    for keyIndex, valueList in enumerate(net.detect(image, thresholds = [(math.ceil(minConfidence * 255), 255)])):
         if (keyIndex == 0): continue
         if (len(valueList) == 0): 
             key = (keyIndex, MVHelper.flagFind)
@@ -73,25 +63,22 @@ while(True):
             
             continue
 
+        #渲染圆标记目标位置
         for value in valueList:
-            myBlob = value.rect()
-            centerX = math.floor(myBlob.x() + myBlob.w() / 2) #type:ignore
-            centerY = math.floor(myBlob.y() + myBlob.h() / 2) #type:ignore
-
-            img.draw_circle((centerX, centerY, 12), color = circleColors[keyIndex], thickness = 2)
-            
+            blob = value.rect()
+            centerX = math.floor(BlobHelper.getX(blob) + BlobHelper.getW(blob) / 2)
+            centerY = math.floor(BlobHelper.getY(blob) + BlobHelper.getH(blob) / 2)
             key = (keyIndex, MVHelper.flagFind)
+
+            image.draw_circle((centerX, centerY, 12), color = ColorsHelper.circleColors[keyIndex], thickness = 2)
 
             if (key in DetectionHelper.detectionMap):
                 targetType = DetectionHelper.detectionMap[key]
-
-                img.draw_string(10, 10, targetType + '!')
-
-                detectionHelper.myCount = MVHelper.stateTransform(img, myBlob, detectionHelper.myCount, targetType)
+                DetectionHelper.detectCount = MVHelper.stateTransform(image, blob, DetectionHelper.detectCount, targetType)
 
     #读取串口
-    if (uart3.any()):
-        data = uart3.read()
+    if (MVHelper.UART3.any()):
+        data = MVHelper.UART3.read()
 
         if (len(data) == 0): continue
         if (
@@ -119,7 +106,7 @@ while(True):
         print('leftCtrl:', leftCtrl)
         print('rightCtrl:', rightCtrl)
 
-        timeData = pyb.millis()
+        timeData = TimeHelper.getCurrentTime()
 
         if (timeData - lastTime > 2000):
             lastTime = timeData
@@ -133,11 +120,11 @@ while(True):
         continue
 
     #忽略过小目标
-    if (MVHelper.maxBlob.w() * MVHelper.maxBlob.h() <= 100): continue #type:ignore
+    if (BlobHelper.getW(MVHelper.maxBlob) * BlobHelper.getW(MVHelper.maxBlob) <= 100): continue
 
     #自动控制逻辑
-    xError = math.floor(MVHelper.maxBlob[0] + MVHelper.maxBlob.w() / 2 - img.width() / 2) #type:ignore
-    hError = MVHelper.maxBlob.w() * MVHelper.maxBlob.h() - sizeThreshold #type:ignore
+    xError = math.floor(BlobHelper.getX(MVHelper.maxBlob) + BlobHelper.getW(MVHelper.maxBlob) / 2 - image.width() / 2)
+    hError = BlobHelper.getW(MVHelper.maxBlob) * BlobHelper.getW(MVHelper.maxBlob) - ColorsHelper.sizeThreshold
     xOutput = xPid.getPid(xError, 1)
     hOutput = hPid.getPid(hError, 1)
     leftOut = min(500, -xOutput - hOutput)
@@ -145,7 +132,7 @@ while(True):
     mappedA = AssistantHelper.mapValue(leftOut, 0, 500, 7.7, 8.5)
     mappedB = AssistantHelper.mapValue(rightOut, 0, 500, 7.7, 8.5)
 
-    img.draw_rectangle(MVHelper.maxBlob[0 : 4], color = (255, 0, 0))
+    image.draw_rectangle(MVHelper.maxBlob[0 : 4], color = (255, 0, 0))
     TurbineHelper.run(mappedA, mappedB)
 
     print("leftOut:", leftOut)
@@ -153,7 +140,7 @@ while(True):
     print("mappedA:", mappedA)
     print("mappedB:", mappedB)
 
-    timeData = pyb.millis()
+    timeData = TimeHelper.getCurrentTime()
     
     if (timeData - lastTime > 2000):
         lastTime = timeData
