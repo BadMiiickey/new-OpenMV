@@ -9,11 +9,11 @@ from Helper.PIDHelper import PIDHelper
 from Helper.TimeHelper import TimeHelper
 from Helper.TurbineHelper import TurbineHelper
 
+#机器学习文件加载
 try:
     net = tf.load("trained.tflite", load_to_fb = uos.stat('trained.tflite')[6] > (gc.mem_free() - (64 * 1024))) #type:ignore
 except Exception as e:
     raise Exception('Failed to load "trained.tflite" (' + str(e) + ')')
-
 try:
     labels = [line.rstrip('\n') for line in open("labels.txt")]
 except Exception as e:
