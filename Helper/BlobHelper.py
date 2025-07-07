@@ -10,12 +10,12 @@ class BlobHelper:
     def getY(blob: list[int]):
         return blob[1]
     
-    #获取像素宽度(width)
+    #获取像素width
     @staticmethod
     def getW(blob: list[int]):
         return blob[2]
     
-    #获取像素高度(height)
+    #获取像素height
     @staticmethod
     def getH(blob: list[int]):
         return blob[3]
