@@ -45,6 +45,9 @@ while(True):
     image = sensor.snapshot()
     minConfidence = 0.8 if (MVHelper.flagFind == 3) else 0.97
 
+    #LED闪烁
+    # AssistantHelper.toggleLED(2, 0.5) 
+
     #渲染当前目标信息
     MVHelper.renderCurrentTargetString(image)
     MVHelper.renderCurrentTargetCount(image, DetectionHelper.detectCount)
@@ -74,7 +77,7 @@ while(True):
 
             if (key in DetectionHelper.detectionMap):
                 targetType = DetectionHelper.detectionMap[key]
-                DetectionHelper.detectCount = MVHelper.stateTransform(image, blob, DetectionHelper.detectCount, targetType)
+                MVHelper.stateTransform(image, blob, targetType)
 
     #读取串口
     if (MVHelper.UART3.any()):
@@ -92,7 +95,7 @@ while(True):
             if (not movementSequenceEnabled): continue
 
             TurbineHelper.run(7.4, 7.4)
-            time.sleep_ms(5000) #type:ignore
+            time.sleep(5)
             TimeHelper.delayWithStartAction(8000, lambda: TurbineHelper.run(8.5, 8.5))
             movementSequenceEnabled = False
 

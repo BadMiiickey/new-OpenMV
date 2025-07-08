@@ -9,6 +9,8 @@ class MVHelper:
     maxBlob = [0, 0, 0, 0, 0, 0, 0, 0] #[x, y, w, h, pixels, cx, cy, rotation]
     maxSize = 0
     neededCheckTimes = 3
+    lastDetectedType = None
+    stableFrames = 0
     clock = time.clock() #type:ignore
     UART3 = pyb.UART(3, 115200)
 
@@ -36,13 +38,25 @@ class MVHelper:
 
     #状态转换, 切换识别颜色目标
     @classmethod
-    def stateTransform(cls, img: Image, blob: list[int], detectCount: int, targetType: str):
-        requiredCheckTimes = cls.neededCheckTimes + 1 if targetType == 'BLACK' else cls.neededCheckTimes
-        detectCount += 1
+    def stateTransform(cls, img: Image, blob: list[int], targetType: str):
+        if targetType == cls.lastDetectedType:
+            cls.stableFrames += 1
+        else:
+            cls.stableFrames = 0
+            cls.lastDetectedType = targetType
+        
+        minStableFrames = 12
 
-        if (detectCount >= requiredCheckTimes):
+        if cls.stableFrames >= minStableFrames:
+            DetectionHelper.detectCount += 1
+
+        requiredCheckTimes = cls.neededCheckTimes + 1 if targetType == 'BLACK' else cls.neededCheckTimes
+
+        if (DetectionHelper.detectCount >= requiredCheckTimes):
             cls.maxSize = 0
             cls.flagFind += 1
+            DetectionHelper.detectCount = 0
+            cls.stableFrames = 0
 
         if (cls.flagFind >= 4):
             cls.flagFind = 1
@@ -50,11 +64,6 @@ class MVHelper:
         if (BlobHelper.getW(blob) * BlobHelper.getH(blob) > cls.maxSize):
             cls.maxBlob = blob
             cls.maxSize = BlobHelper.getW(blob) * BlobHelper.getH(blob)
-
-        if ((targetType == 'BLACK' and detectCount >= 4) or (targetType != 'BLACK' and detectCount >= 3)):
-            detectCount = 0
-
-        return detectCount
     
     #渲染当前需要识别的目标颜色
     @classmethod
