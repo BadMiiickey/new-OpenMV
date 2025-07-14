@@ -5,12 +5,18 @@ from Helper.DetectionHelper import DetectionHelper
 from image import Image #type:ignore
 
 class MVHelper:
-    flagFind = 1
+    flagFind = 1 #当前识别目标状态, 1: RED, 2: YELLOW, 3: BLACK
     maxBlob = [0, 0, 0, 0, 0, 0, 0, 0] #[x, y, w, h, pixels, cx, cy, rotation]
-    maxSize = 0
-    neededCheckTimes = 3
-    lastDetectedType = None
-    stableFrames = 0
+    maxSize = 0 #当前识别像素的最大面积
+
+    neededCheckTimes = 3 #默认识别次数. 黑色需要 4 次, 其他颜色需要 3 次
+    lastDetectedType = None #上次识别的目标颜色
+    stableFrames = 0 #当前稳定识别的帧数
+
+    lightMin = 20 #光线最小值, 低于此值则认为光线不足
+    lightMax = 50 #光线最大值, 高于此值则认为光线过强
+    currentExposure = 1000 #当前曝光时间, 单位微秒
+
     clock = time.clock() #type:ignore
     UART3 = pyb.UART(3, 115200)
 
@@ -20,36 +26,31 @@ class MVHelper:
         sensor.reset()
         sensor.set_pixformat(sensor.RGB565)
         sensor.set_framesize(sensor.QVGA)
-        sensor.skip_frames(10)
-        sensor.set_auto_whitebal(False)
-        sensor.set_auto_gain(False)
+        sensor.skip_frames(30) #等待摄像头稳定跳过的帧数
+        sensor.set_auto_whitebal(False) #关闭自动白平衡
+        sensor.set_auto_gain(False) #关闭自动增益
+        sensor.set_auto_exposure(False, exposure_us = cls.currentExposure) #关闭自动曝光, 设置曝光时间
 
-        cls.clock = cls.clock.tick()
-        cls.UART3 = pyb.UART(3, 115200)
+        cls.clock = cls.clock.tick() 
+        cls.UART3 = pyb.UART(3, 115200) #初始化 UART3
 
-        cls.UART3.init(115200, 8, None, 1)
+        cls.UART3.init(115200, 8, None, 1) 
 
-    #设置摄像头曝光状态
-    @staticmethod
-    def setMVParams(autoWhiteBal: bool, autoGain: bool, autoExposure: bool, exposureUs: int):
-        sensor.set_auto_whitebal(autoWhiteBal)
-        sensor.set_auto_gain(autoGain)
-        sensor.set_auto_exposure(autoExposure, exposure_us = exposureUs)
-
-    #状态转换, 切换识别颜色目标
+    #判别当前目标识别是否稳定
     @classmethod
-    def stateTransform(cls, img: Image, blob: list[int], targetType: str):
+    def targetTypeStablize(cls, targetType: str):
         if targetType == cls.lastDetectedType:
             cls.stableFrames += 1
         else:
             cls.stableFrames = 0
             cls.lastDetectedType = targetType
-        
-        minStableFrames = 12
 
-        if cls.stableFrames >= minStableFrames:
-            DetectionHelper.detectCount += 1
+    #状态转换, 切换识别颜色目标
+    @classmethod
+    def stateTransform(cls, img: Image, blob: list[int], targetType: str):
+        cls.targetTypeStablize(targetType)
 
+        DetectionHelper.detectCount += 1 if cls.stableFrames >= 12 else 0
         requiredCheckTimes = cls.neededCheckTimes + 1 if targetType == 'BLACK' else cls.neededCheckTimes
 
         if (DetectionHelper.detectCount >= requiredCheckTimes):
@@ -95,3 +96,24 @@ class MVHelper:
             
             image.draw_rectangle(area, color = (255, 0, 0))
             image.draw_string(10, 46, 'VALID CIRCLE')
+
+    #自动调整曝光时间
+    @classmethod
+    def autoAdjustExposure(cls, image: Image):
+        
+        stats = image.get_statistics()
+        currentBrightness = stats.l_mean() #获取亮度
+
+        print("Current Brightness:", currentBrightness)
+        print("Current Exposure:", cls.currentExposure)
+
+        if (currentBrightness < cls.lightMin):
+            sensor.set_auto_exposure(False, exposure_us = cls.currentExposure + 1000)
+
+            cls.currentExposure += 1000
+        elif (currentBrightness > cls.lightMax):
+            exposure = max(1000, cls.currentExposure - 1000)
+
+            sensor.set_auto_exposure(False, exposure_us = exposure)
+            
+            cls.currentExposure = exposure

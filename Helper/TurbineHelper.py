@@ -53,7 +53,9 @@ class TurbineHelper:
         #计算左轮PWM脉冲宽度
         leftPulseWith = int(abs(leftSpeed) * cls.period / 100)
         cls.ch1.pulse_width(leftPulseWith)
+        print("Left Pulse Width:", leftPulseWith)
 
         #计算右轮PWM脉冲宽度
         rightPulseWith = int(abs(rightSpeed) * cls.period / 100)
         cls.ch2.pulse_width(rightPulseWith)
+        print("Right Pulse Width:", rightPulseWith)

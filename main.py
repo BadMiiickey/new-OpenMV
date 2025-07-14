@@ -45,8 +45,12 @@ while(True):
     image = sensor.snapshot()
     minConfidence = 0.8 if (MVHelper.flagFind == 3) else 0.97
 
-    #LED闪烁
-    # AssistantHelper.toggleLED(2, 0.5) 
+    #自动曝光调整
+    MVHelper.autoAdjustExposure(image)
+
+    #LED
+    # AssistantHelper.toggleLED(2, 0.5) #OpenMV的绿色LED
+    AssistantHelper.showCurrentTarget(MVHelper.flagFind) #编号[1] = 红色, [2] = 绿色, [3] = 蓝色
 
     #渲染当前目标信息
     MVHelper.renderCurrentTargetString(image)
@@ -94,15 +98,15 @@ while(True):
 
             if (not movementSequenceEnabled): continue
 
-            TurbineHelper.run(7.4, 7.4)
+            TurbineHelper.run(7.5, 7.5)
             time.sleep(5)
             TimeHelper.delayWithStartAction(8000, lambda: TurbineHelper.run(8.5, 8.5))
             movementSequenceEnabled = False
 
     #手动控制逻辑
     if (not isAutoControl):
-        leftCtrl = AssistantHelper.mapValue(data[1], 110, 200, 5, 10) if (data[1] != 0 and data[2] != 0) else 7.4
-        rightCtrl = AssistantHelper.mapValue(data[2], 110, 200, 5, 10) if (data[1] != 0 and data[2] != 0) else 7.4
+        leftCtrl = AssistantHelper.mapValue(data[1], 110, 200, 5, 10) if (data[1] != 0 and data[2] != 0) else 7.5
+        rightCtrl = AssistantHelper.mapValue(data[2], 110, 200, 5, 10) if (data[1] != 0 and data[2] != 0) else 7.5
 
         TurbineHelper.run(leftCtrl, rightCtrl)
 
@@ -119,15 +123,15 @@ while(True):
 
     #未检测到目标
     if (MVHelper.maxSize == 0):
-        TurbineHelper.run(7.55, 7.25)
+        TurbineHelper.run(7.52, 7.57)
         continue
 
     #忽略过小目标
-    if (BlobHelper.getW(MVHelper.maxBlob) * BlobHelper.getW(MVHelper.maxBlob) <= 100): continue
+    if (BlobHelper.getW(MVHelper.maxBlob) * BlobHelper.getH(MVHelper.maxBlob) <= 100): continue
 
     #自动控制逻辑
     xError = math.floor(BlobHelper.getX(MVHelper.maxBlob) + BlobHelper.getW(MVHelper.maxBlob) / 2 - image.width() / 2)
-    hError = BlobHelper.getW(MVHelper.maxBlob) * BlobHelper.getW(MVHelper.maxBlob) - ColorsHelper.sizeThreshold
+    hError = BlobHelper.getW(MVHelper.maxBlob) * BlobHelper.getH(MVHelper.maxBlob) - ColorsHelper.sizeThreshold
     xOutput = xPid.getPid(xError, 1)
     hOutput = hPid.getPid(hError, 1)
     leftOut = min(500, -xOutput - hOutput)
@@ -135,7 +139,7 @@ while(True):
     mappedA = AssistantHelper.mapValue(leftOut, 0, 500, 7.7, 8.5)
     mappedB = AssistantHelper.mapValue(rightOut, 0, 500, 7.7, 8.5)
 
-    image.draw_rectangle(MVHelper.maxBlob[0 : 4], color = (255, 0, 0))
+    image.draw_rectangle(MVHelper.maxBlob[0 : 4], color = (255, 0, 0)) #渲染最大像素矩形外框
     TurbineHelper.run(mappedA, mappedB)
 
     print("leftOut:", leftOut)

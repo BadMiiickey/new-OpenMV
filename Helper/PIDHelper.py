@@ -18,7 +18,7 @@ class PIDHelper:
         self.imax = float(imax)
         self.lastDerivative = float('NaN')
 
-    def getPid(self, error: float | int, scaler: float | int):
+    def getPid(self, error: float | int, scaler: float | int) -> float | int:
         tNow = pyb.millis()
         dt = tNow - self.lastT
         output = 0
