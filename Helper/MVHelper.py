@@ -8,14 +8,15 @@ class MVHelper:
     flagFind = 1 #当前识别目标状态, 1: RED, 2: YELLOW, 3: BLACK
     maxBlob = [0, 0, 0, 0, 0, 0, 0, 0] #[x, y, w, h, pixels, cx, cy, rotation]
     maxSize = 0 #当前识别像素的最大面积
+    minConfidence = 0.8 if (flagFind == 3) else 0.97
 
     neededCheckTimes = 3 #默认识别次数. 黑色需要 4 次, 其他颜色需要 3 次
     lastDetectedType = None #上次识别的目标颜色
     stableFrames = 0 #当前稳定识别的帧数
 
-    lightMin = 20 #光线最小值, 低于此值则认为光线不足
+    lightMin = 25 #光线最小值, 低于此值则认为光线不足
     lightMax = 50 #光线最大值, 高于此值则认为光线过强
-    currentExposure = 1000 #当前曝光时间, 单位微秒
+    currentExposure = 1000 #当前曝光时间, 单位微秒(初始设置为1000)
 
     clock = time.clock() #type:ignore
     UART3 = pyb.UART(3, 115200)

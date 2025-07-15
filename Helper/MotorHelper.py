@@ -1,22 +1,28 @@
 from pyb import Pin, Timer #type:ignore
 
-class TurbineHelper:
+class MotorHelper:
     inverseLeft = False
     inverseRight = False
+
     ain1 = Pin('P0', Pin.OUT_PP)
     ain2 = Pin('P1', Pin.OUT_PP)
     bin1 = Pin('P2', Pin.OUT_PP)
     bin2 = Pin('P3', Pin.OUT_PP)
+
     pwmA = Pin('P7')
     pwmB = Pin('P8')
+
     tim = Timer(4, freq = 50)
-    ch1 = tim.channel(1, Timer.PWM, pin = pwmA)
-    ch2 = tim.channel(2, Timer.PWM, pin = pwmB)
     period = tim.period()
 
+    ch1 = tim.channel(1, Timer.PWM, pin = pwmA)
+    ch2 = tim.channel(2, Timer.PWM, pin = pwmB)
+
+    isAutoControl = True #是否自动控制
+
     def __init__(self, inverseLeft = False, inverseRight = False):
-        TurbineHelper.inverseLeft = inverseLeft
-        TurbineHelper.inverseRight = inverseRight
+        MotorHelper.inverseLeft = inverseLeft
+        MotorHelper.inverseRight = inverseRight
 
         #高低电平初始化
         self.ain1.low()
@@ -30,7 +36,7 @@ class TurbineHelper:
 
     #设置舵机左右电机的速度
     @classmethod
-    def run(cls, leftSpeed: float | int, rightSpeed: float | int):
+    def setMotorSpeed(cls, leftSpeed: float | int, rightSpeed: float | int):
         leftSpeed = -leftSpeed if cls.inverseLeft else leftSpeed
         rightSpeed = -rightSpeed if cls.inverseRight else rightSpeed
 
@@ -59,3 +65,7 @@ class TurbineHelper:
         rightPulseWith = int(abs(rightSpeed) * cls.period / 100)
         cls.ch2.pulse_width(rightPulseWith)
         print("Right Pulse Width:", rightPulseWith)
+
+    @staticmethod
+    def linearMap(x: float | int, inMin: float | int, inMax: float | int, outMin: float | int, outMax: float | int):
+        return (x - inMin) * (outMax - outMin) / (inMax - inMin) + outMin

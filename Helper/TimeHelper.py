@@ -1,16 +1,23 @@
 import pyb #type:ignore
 
+from Helper.MotorHelper import MotorHelper
+
 class TimeHelper:
+    lastTime = 0
 
     #获取当前时间
     @staticmethod
     def getCurrentTime() -> int:
         return pyb.millis()
-    
-    #延时函数, 在指定的毫秒数内执行指定的函数
-    @classmethod
-    def delayWithStartAction(cls, durationMs: int, action):
-        startTime = cls.getCurrentTime()
 
-        while (cls.getCurrentTime() - startTime < durationMs):
-            action()
+    #自动控制逻辑中, 每次循环结束时更新lastTime
+    @classmethod
+    def updateLastTime(cls):
+        cls.lastTime = cls.getCurrentTime() if (cls.getCurrentTime() - cls.lastTime > 2000) else cls.lastTime
+
+    #更新lastTime, 2s未进行手动控制时, 切换为自动控制
+    @classmethod
+    def updateLastTimeWhenNotAutoControl(cls, checkTimeMs: int = 2000):
+        if (cls.getCurrentTime() - cls.lastTime > 2000):
+            cls.lastTime = cls.getCurrentTime()
+            MotorHelper.isAutoControl = True
