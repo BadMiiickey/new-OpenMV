@@ -8,6 +8,7 @@ from Helper.MVHelper import MVHelper
 from Helper.PIDHelper import PIDHelper
 from Helper.TimeHelper import TimeHelper
 from Helper.MotorHelper import MotorHelper
+from Helper.PrintHelper import PrintHelper
 
 #机器学习文件加载
 try:
@@ -20,12 +21,12 @@ except Exception as e:
     raise Exception('Failed to load "labels.txt" (' + str(e) + ')')
 
 #涡轮初始化
-MotorHelper(inverseLeft = False, inverseRight = False)
+MotorHelper.motorInit()
 MotorHelper.setMotorSpeed(7.5, 7.5)
-time.sleep(3)
+time.sleep(6) #极度玄学, 慎调!
 
 #OpenMV初始化
-# MVHelper.mvInit()
+MVHelper.mvInit()
 
 #PID初始实例化
 xPid = PIDHelper(1, 1, 0, 100)
@@ -37,16 +38,20 @@ while(True):
     MVHelper.maxSize = 0
     image = sensor.snapshot()
 
+    #终端输出
+    PrintHelper.messagePrint(3)
+
     #自动曝光调整
     MVHelper.autoAdjustExposure(image)
 
     #LED
-    LEDHelper.toggleLED(2, 0.5) #OpenMV绿色LED闪烁
+    # LEDHelper.toggleLED(2, 0.5) #OpenMV绿色LED闪烁
     LEDHelper.showCurrentTarget(MVHelper.flagFind) #编号[1] = 红色, [2] = 绿色, [3] = 蓝色
 
     #渲染当前目标信息
     MVHelper.renderCurrentTargetString(image)
-    MVHelper.renderCurrentTargetCount(image, DetectionHelper.detectCount)
+    MVHelper.renderCurrentTargetCount(image)
+    MVHelper.renderCurrentBrightness(image)
 
     #渲染当前识别出的最大圆
     MVHelper.validateCircle(image)
@@ -91,27 +96,23 @@ while(True):
 
     #手动控制逻辑
     if (not MotorHelper.isAutoControl):
-        leftCtrl = MotorHelper.linearMap(data[1], 110, 200, 5, 10) if (data[1] != 0 and data[2] != 0) else 7.5
-        rightCtrl = MotorHelper.linearMap(data[2], 110, 200, 5, 10) if (data[1] != 0 and data[2] != 0) else 7.5
+        MotorHelper.leftCtrl = MotorHelper.linearMap(data[1], 110, 200, 5, 10) if (data[1] != 0 and data[2] != 0) else 7.5
+        MotorHelper.rightCtrl = MotorHelper.linearMap(data[2], 110, 200, 5, 10) if (data[1] != 0 and data[2] != 0) else 7.5
 
-        MotorHelper.setMotorSpeed(leftCtrl, rightCtrl)
-
-        print('leftCtrl:', leftCtrl)
-        print('rightCtrl:', rightCtrl)
-
+        MotorHelper.setMotorSpeed(MotorHelper.leftCtrl, MotorHelper.rightCtrl)
         TimeHelper.updateLastTimeWhenNotAutoControl()
         continue
 
     #未检测到目标
     if (MVHelper.maxSize == 0):
-        MotorHelper.setMotorSpeed(7.55, 7.55) #设置电机转速, 使得小船原地旋转
+        MotorHelper.setMotorSpeed(7.7, 7.0) #设置电机转速, 使得小船原地旋转
         continue
 
     #忽略过小目标
     if (BlobHelper.getW(MVHelper.maxBlob) * BlobHelper.getH(MVHelper.maxBlob) <= 100): continue
 
     #自动控制逻辑
-    #计算水平(xError)及距离(hError)误差
+    #计算水平(xError)误差
     xError = math.floor(BlobHelper.getX(MVHelper.maxBlob) + BlobHelper.getW(MVHelper.maxBlob) / 2 - image.width() / 2)
     hError = BlobHelper.getW(MVHelper.maxBlob) * BlobHelper.getH(MVHelper.maxBlob) - ColorsHelper.sizeThreshold
 
@@ -120,19 +121,13 @@ while(True):
     hOutput = hPid.getPid(hError, 1)
 
     #差动驱动控制
-    leftOut = min(500, -xOutput - hOutput)
-    rightOut = min(500, xOutput - hOutput)
+    MotorHelper.leftOut = min(500, -xOutput - hOutput)
+    MotorHelper.rightOut = min(500, xOutput - hOutput)
 
     #计算映射后的实际电机速度
-    mappedA = MotorHelper.linearMap(leftOut, 0, 500, 7.7, 8.5)
-    mappedB = MotorHelper.linearMap(rightOut, 0, 500, 7.7, 8.5)
+    MotorHelper.mappedA = MotorHelper.linearMap(MotorHelper.leftOut, 0, 500, 7.7, 8.5)
+    MotorHelper.mappedB = MotorHelper.linearMap(MotorHelper.rightOut, 0, 500, 7.7, 8.5)
 
     image.draw_rectangle(MVHelper.maxBlob[0 : 4], color = (255, 0, 0))
-    MotorHelper.setMotorSpeed(mappedA, mappedB)
-
-    print("leftOut:", leftOut)
-    print("rightOut:", rightOut)
-    print("mappedA:", mappedA)
-    print("mappedB:", mappedB)
-
+    MotorHelper.setMotorSpeed(MotorHelper.mappedA, MotorHelper.mappedB)
     TimeHelper.updateLastTime()

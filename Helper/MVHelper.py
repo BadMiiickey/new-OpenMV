@@ -14,8 +14,9 @@ class MVHelper:
     lastDetectedType = None #上次识别的目标颜色
     stableFrames = 0 #当前稳定识别的帧数
 
-    lightMin = 25 #光线最小值, 低于此值则认为光线不足
-    lightMax = 50 #光线最大值, 高于此值则认为光线过强
+    lightMin = 30 #光线最小值, 低于此值则认为光线不足
+    lightMax = 45 #光线最大值, 高于此值则认为光线过强
+    currentBrightness: int | float = 0 #当前亮度
     currentExposure = 1000 #当前曝光时间, 单位微秒(初始设置为1000)
 
     clock = time.clock() #type:ignore
@@ -80,8 +81,13 @@ class MVHelper:
 
     #渲染当前识别次数
     @staticmethod
-    def renderCurrentTargetCount(image: Image, detectCount: int):
-        image.draw_string(10, 28, 'CURRENT COUNT: ' + str(detectCount))
+    def renderCurrentTargetCount(image: Image):
+        image.draw_string(10, 28, 'CURRENT COUNT: ' + str(DetectionHelper.detectCount))
+
+    #渲染当前屏幕亮度
+    @classmethod
+    def renderCurrentBrightness(cls, image: Image):
+        image.draw_string(10, 46, 'CURRENT BRIGHTNESS: ' + str(cls.currentBrightness))
 
     #渲染当前识别的最大圆形目标
     @staticmethod
@@ -103,16 +109,13 @@ class MVHelper:
     def autoAdjustExposure(cls, image: Image):
         
         stats = image.get_statistics()
-        currentBrightness = stats.l_mean() #获取亮度
+        cls.currentBrightness = stats.l_mean() #获取亮度
 
-        print("Current Brightness:", currentBrightness)
-        print("Current Exposure:", cls.currentExposure)
-
-        if (currentBrightness < cls.lightMin):
+        if (cls.currentBrightness < cls.lightMin):
             sensor.set_auto_exposure(False, exposure_us = cls.currentExposure + 1000)
 
             cls.currentExposure += 1000
-        elif (currentBrightness > cls.lightMax):
+        elif (cls.currentBrightness > cls.lightMax):
             exposure = max(1000, cls.currentExposure - 1000)
 
             sensor.set_auto_exposure(False, exposure_us = exposure)
