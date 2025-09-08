@@ -9,7 +9,7 @@ class SensorHandler:
     buffer = bytearray()  # 用于存储接收到的数据
 
     minValidDistance: int = 100  # 最小有效距离, 小于此值则认为测量无效
-    touchValidDistance: int = 140  # 有效触碰距离, 小于此值则认为是触碰
+    touchValidDistance: int = 200  # 有效触碰距离, 小于此值则认为是触碰
     touchCount: int = 0 # 触碰计数, 排除异常数据的干扰
 
     # 初始化激光传感器
@@ -17,21 +17,6 @@ class SensorHandler:
     def sensorInit(cls):
         cls.UART1.init(921600, 8, None, 1)
         time.sleep(2)
-
-    # 获取最近的测量距离
-    @classmethod
-    def getClosestDistance(cls, data):
-        rawData = list(data)
-        distanceList = []
-
-        for i in range(6, len(rawData) - 2, 3):
-            if (i + 1 >= len(rawData)): continue
-
-            distance = rawData[i] + (rawData[i + 1] << 8)
-            
-            distanceList.append(distance)
-
-        return min(distanceList) if (distanceList) else float('inf')
 
     # 读取一帧数据, 返回完整的47字节数据, 帧头为0x54
     @classmethod
@@ -49,15 +34,30 @@ class SensorHandler:
         return None
 
     # 更新触碰计数
-    @staticmethod
-    def updateTouchCount(data):
-        if (SensorHandler.getClosestDistance(data) <= SensorHandler.touchValidDistance):
-            SensorHandler.touchCount += 1
+    @classmethod
+    def updateTouchCount(cls, data):
+        if (cls.__getClosestDistance(data) <= cls.touchValidDistance):
+            cls.touchCount += 1
         else:
-            SensorHandler.touchCount = 0
+            cls.touchCount = 0
 
-        # 连续5次均小于140mm则认为是有效数据
-        if (SensorHandler.touchCount >= 5):
-            SensorHandler.touchCount = 0
+        # 连续3次均小于200mm则认为是有效数据
+        if (cls.touchCount >= 3):
+            cls.touchCount = 0
             MVHandler.currentTarget += 1
             MVHandler.currentTarget = 1 if (MVHandler.currentTarget >= 4) else MVHandler.currentTarget
+    
+    # 获取最近的测量距离
+    @classmethod
+    def __getClosestDistance(cls, data):
+        rawData = list(data)
+        distanceList = []
+
+        for i in range(6, len(rawData) - 2, 3):
+            if (i + 1 >= len(rawData)): continue
+
+            distance = rawData[i] + (rawData[i + 1] << 8)
+            
+            distanceList.append(distance)
+
+        return min(distanceList) if (distanceList) else float('inf')

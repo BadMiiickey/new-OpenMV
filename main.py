@@ -38,18 +38,14 @@ SensorHandler.sensorInit()
 
 # 循环执行部分
 while(True):
-    data = None
+    image = sensor.snapshot()
+    result = net.predict([image])
 
-    # 读取激光传感器数据
-    if (SensorHandler.UART1.any()):
-        data = SensorHandler.readFrame()
-
-        if (data):
-            SensorHandler.updateTouchCount(data)
+    if (not result or len(result) <= 0): continue
 
     MVHandler.clock
+
     MVHandler.maxSize = 0
-    image = sensor.snapshot()
 
     # 自动曝光调整
     MVHandler.autoAdjustExposure(image)
@@ -63,28 +59,14 @@ while(True):
     MVHandler.renderCurrentBrightness(image)
 
     # 目标检测
-    result = net.predict([image])
+    (scores, maxConfidence, gridX, gridY) = DetectionHandler.analyseResult(result, MVHandler.currentTarget)
 
-    if (result and len(result) > 0):
-        (maxConfidence, gridX, gridY) = DetectionHandler.analyseResult(result, MVHandler.currentTarget)
-        print("Max Confidence:", maxConfidence)
-        scores = result[0][0]
-        gridH = scores.shape[-3]
-        gridW = scores.shape[-2]
+    if (maxConfidence >= MVHandler.minConfidence):
+        (leftX, leftY, w, h, pixels, centerX, centerY, rotation) = DetectionHandler.getMaxBlob(image, scores, gridX, gridY)
+        MVHandler.maxBlob = [leftX, leftY, w, h, pixels, centerX, centerY, 0]
+        MVHandler.maxSize = pixels
 
-        if (maxConfidence >= MVHandler.minConfidence):
-            centerX = int((gridX + 0.5) * image.width() / gridW)
-            centerY = int((gridY + 0.5) * image.height() / gridH)
-            w = int(image.width() / gridW)
-            h = int(image.height() / gridH)
-            leftX = centerX - w // 2
-            leftY = centerY - h // 2
-            pixels = w * h
-
-            image.draw_circle((centerX, centerY, 12), color=ColorsHandler.circleColors[MVHandler.currentTarget], thickness=2)
-            
-            MVHandler.maxBlob = [leftX, leftY, w, h, pixels, centerX, centerY, 0]
-            MVHandler.maxSize = pixels
+        image.draw_circle((centerX, centerY, 12), color=ColorsHandler.circleColors[MVHandler.currentTarget], thickness=2)
 
     # # 手动控制逻辑
     # if (not MotorHandler.isAutoControl):
@@ -96,7 +78,7 @@ while(True):
     #     continue
 
     # 未检测到目标或目标过小
-    if (MVHandler.maxSize == 0 or BlobHandler.getPixels(MVHandler.maxBlob) <= 100): 
+    if (MVHandler.maxSize == 0 or BlobHandler.getPixels(MVHandler.maxBlob) <= 50): 
         MotorHandler.UART3.write('a755b725c')
         continue
 
@@ -118,11 +100,11 @@ while(True):
     MotorHandler.mappedB = MotorHandler.linearMap(MotorHandler.rightOut, 0, 500, 7.7, 8.5)
 
     image.draw_rectangle(MVHandler.maxBlob[0 : 4], color = (255, 0, 0))
-
     MotorHandler.UART3.write(f'a{ MotorHandler.mappedA }b{ MotorHandler.mappedB }c')
+    
+    # 读取激光传感器数据
+    if (SensorHandler.UART1.any()):
+        sensorData = SensorHandler.readFrame()
 
-    # MotorHandler.setMotorSpeed(MotorHandler.mappedA, MotorHandler.mappedB + 0.4) # + 0.3 ~ 0.4
-    # time.sleep_ms(100) # type:ignore
-
-    # MotorHandler.setMotorSpeed(MotorHandler.mappedA, MotorHandler.mappedB)
-    # TimeHandler.updateLastTime()
+        if (sensorData):
+            SensorHandler.updateTouchCount(sensorData)

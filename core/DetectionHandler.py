@@ -1,8 +1,10 @@
+from image import Image # type: ignore
+
 class DetectionHandler:
     detectionMap = {
-        (1, 3): "GREEN",
-        (2, 1): "RED",
-        (3, 2): "YELLOW"
+        1: "GREEN",
+        2: "RED",
+        3: "YELLOW"
     }
     detectCount = 0
 
@@ -19,14 +21,25 @@ class DetectionHandler:
             
         for (yIndex, yValue) in enumerate(scores):
             for (xIndex, xValue) in enumerate(yValue):
-                if(xValue[currentTarget] <= maxConfidence): continue
+                if (xValue[currentTarget] <= maxConfidence): continue
                 
                 maxConfidence = max(xValue[currentTarget], maxConfidence)
                 bestX = xIndex
                 bestY = yIndex
 
-        return (maxConfidence, bestX, bestY)
+        return (scores, maxConfidence, bestX, bestY)
 
+    @staticmethod
+    def getMaxBlob(image: Image, scores, gridX: int, gridY: int):
+        gridH = scores.shape[-3]
+        gridW = scores.shape[-2]
 
+        centerX = int((gridX + 0.5) * image.width() / gridW)
+        centerY = int((gridY + 0.5) * image.height() / gridH)
+        w = int(image.width() / gridW)
+        h = int(image.height() / gridH)
+        leftX = centerX - w // 2
+        leftY = centerY - h // 2
+        pixels = w * h
 
-        
+        return (leftX, leftY, w, h, pixels, centerX, centerY, 0)
