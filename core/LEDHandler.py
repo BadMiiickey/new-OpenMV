@@ -2,7 +2,7 @@ import time
 
 from pyb import LED #type:ignore
 
-class LEDHelper:
+class LEDHandler:
     
     #LED闪烁
     @staticmethod

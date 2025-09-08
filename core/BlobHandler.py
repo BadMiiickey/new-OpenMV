@@ -1,4 +1,4 @@
-class BlobHelper:
+class BlobHandler:
 
     #获取像素x
     @staticmethod
@@ -19,3 +19,8 @@ class BlobHelper:
     @staticmethod
     def getH(blob: list[int]):
         return blob[3]
+    
+    #获取像素面积
+    @staticmethod
+    def getPixels(blob: list[int]):
+        return blob[4]

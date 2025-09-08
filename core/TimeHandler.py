@@ -1,8 +1,8 @@
-import pyb #type:ignore
+import pyb # type:ignore
 
-from Helper.MotorHelper import MotorHelper
+from core.MotorHandler import MotorHandler
 
-class TimeHelper:
+class TimeHandler:
     lastTime = 0
 
     #获取当前时间
@@ -20,4 +20,4 @@ class TimeHelper:
     def updateLastTimeWhenNotAutoControl(cls, checkTimeMs: int = 2000):
         if (cls.getCurrentTime() - cls.lastTime > 2000):
             cls.lastTime = cls.getCurrentTime()
-            MotorHelper.isAutoControl = True
+            MotorHandler.isAutoControl = True
