@@ -65,7 +65,7 @@ while(True):
 
         # 绘制识别结果
         image.draw_circle((centerX, centerY, 12), color=MVHandler.CIRCLE_COLORS[MVHandler.currentTarget], thickness=2)
-        image.draw_rectangle(MVHandler.maxBlob[0 : 4], color = (255, 0, 0))
+        image.draw_rectangle(MVHandler.maxBlob[0 : 4], color=(255, 0, 0))
         
         # 计算误差与PID输出
         xError = image.width() / 2 - centerX
