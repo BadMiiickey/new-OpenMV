@@ -10,13 +10,11 @@ class MotorHandler:
     # 转向PID参数
     xPid = PID(0.17, 0, 0.1)
 
-    # 初始化推进器
     @classmethod
     def motorInit(cls):
         '''初始化推进器'''
         cls.UART3.init(115200, 8, None, 1)
 
-    # 线性映射
     @staticmethod
     def linearMap(x: float | int, inMin: float | int, inMax: float | int, outMin: float | int, outMax: float | int):
         '''线性映射'''

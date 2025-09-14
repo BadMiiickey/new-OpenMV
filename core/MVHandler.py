@@ -38,7 +38,6 @@ class MVHandler:
     currentBrightness: int | float = 0 # 当前亮度
     currentExposure: int = 1000 # 当前曝光时间, 单位微秒(初始设置为1000)
 
-    # 初始化摄像头
     @classmethod
     def mvInit(cls):
         '''初始化摄像头'''
@@ -50,19 +49,16 @@ class MVHandler:
         sensor.set_auto_gain(False) # 关闭自动增益
         sensor.set_auto_exposure(False, exposure_us=cls.currentExposure) # 关闭自动曝光, 设置曝光时间
     
-    # 渲染当前需要识别的目标颜色
     @classmethod
     def renderCurrentTarget(cls, image):
         '''渲染当前需要识别的目标颜色'''
         image.draw_string(10, 10, 'NEEDED COLOR: ' + cls.DETECTION_MAP[cls.currentTarget])
 
-    # 渲染当前屏幕亮度
     @classmethod
     def renderCurrentBrightness(cls, image):
         '''渲染当前屏幕亮度'''
         image.draw_string(10, 28, 'CURRENT BRIGHTNESS: ' + str(cls.currentBrightness))
 
-    # 自动调整曝光时间
     @classmethod
     def autoAdjustExposure(cls, image):
         '''自动调整曝光时间'''
@@ -83,14 +79,12 @@ class MVHandler:
         # 应用新的曝光时间
         sensor.set_auto_exposure(False, exposure_us=cls.currentExposure)
         
-    # 重置最大目标信息
     @classmethod
     def resetMaxBlob(cls):
         '''重置最大目标信息'''
         cls.maxBlob = [0, 0, 0, 0, 0, 0, 0, 0]
         cls.maxSize = 0
 
-    # 分析处理神经网络的输出结果, 返回(scores, maxConfidence, gridX, gridY)
     @classmethod
     def analyseResult(cls, result: list):
         '''分析处理神经网络的输出结果, 返回(scores, maxConfidence, gridX, gridY)'''
@@ -109,7 +103,6 @@ class MVHandler:
 
         return (scores, maxConfidence, bestX, bestY)
 
-    # 获取最大目标的相关信息
     @classmethod
     def getMaxBlob(cls, image, scores, gridX: int, gridY: int):
         '''获取最大目标的相关信息'''
@@ -150,7 +143,6 @@ class MVHandler:
 
         return (x, y, w, h, pixels, centerX, centerY, rotation)
 
-    # 更新识别目标
     @classmethod
     def updateTargetState(cls, closestDistance: float, maxConfidence: float):
         '''更新识别目标'''

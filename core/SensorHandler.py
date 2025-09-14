@@ -11,13 +11,11 @@ class SensorHandler:
 
     buffer: bytearray = bytearray()  # 用于存储接收到的数据
 
-    # 初始化激光传感器
     @classmethod
     def sensorInit(cls):
         '''初始化激光传感器'''
         cls.UART1.init(921600, 8, None, 1)
 
-    # 读取一帧数据, 返回完整的47字节数据, 帧头为0x54
     @classmethod
     def readFrame(cls):
         '''读取一帧数据, 返回完整的47字节数据, 帧头为0x54'''
@@ -44,7 +42,6 @@ class SensorHandler:
         
         return None
 
-    # 获取最近的测量距离
     @classmethod
     def getClosestDistance(cls, data):
         '''获取最近的测量距离'''
@@ -52,7 +49,6 @@ class SensorHandler:
 
         for i in range(6, len(data) - 2, 3):
             distance = data[i] + (data[i + 1] << 8)
-
             minDistance = min(minDistance, distance) if (distance >= cls.MIN_VALID_DISTANCE) else minDistance
 
         return minDistance
