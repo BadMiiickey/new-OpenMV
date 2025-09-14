@@ -1,4 +1,4 @@
-import sensor, ml, uos, gc, math # type: ignore
+import sensor, ml, uos, gc # type: ignore
 
 from core.LEDHandler import LEDHandler
 from core.MVHandler import MVHandler
@@ -68,7 +68,7 @@ while(True):
         image.draw_rectangle(MVHandler.maxBlob[0 : 4], color = (255, 0, 0))
         
         # 计算误差与PID输出
-        xError = math.floor(image.width() / 2 - centerX)
+        xError = image.width() / 2 - centerX
 
         # 计算PID输出
         xOutput = MotorHandler.xPid.get_pid(xError, 1)
