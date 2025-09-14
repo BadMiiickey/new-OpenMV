@@ -1,63 +1,58 @@
-import time # type:ignore
-
-from core.MVHandler import MVHandler
-
 from pyb import UART # type: ignore
 
 class SensorHandler:
     UART1 = UART(1, 921600)  # P0(RX), P1(TX)
-    buffer = bytearray()  # 用于存储接收到的数据
+    MIN_VALID_DISTANCE: int = 110  # 最小有效距离, 小于此值则认为测量无效
+    TOUCH_VALID_DISTANCE: int = 360  # 有效触碰距离, 小于此值则认为是触碰
 
-    minValidDistance: int = 100  # 最小有效距离, 小于此值则认为测量无效
-    touchValidDistance: int = 200  # 有效触碰距离, 小于此值则认为是触碰
-    touchCount: int = 0 # 触碰计数, 排除异常数据的干扰
+    FRAME_HEADER: bytes = b'\x54'  # 帧头
+    FRAME_LENGTH: int = 47  # 帧长度
+    MAX_BUFFER_LENGTH: int = 470  # 最大缓存长度
+
+    buffer: bytearray = bytearray()  # 用于存储接收到的数据
 
     # 初始化激光传感器
     @classmethod
     def sensorInit(cls):
+        '''初始化激光传感器'''
         cls.UART1.init(921600, 8, None, 1)
-        time.sleep(2)
 
     # 读取一帧数据, 返回完整的47字节数据, 帧头为0x54
     @classmethod
     def readFrame(cls):
-        cls.buffer += cls.UART1.read(cls.UART1.any()) if (cls.UART1.any()) else bytearray()
+        '''读取一帧数据, 返回完整的47字节数据, 帧头为0x54'''
+        data = cls.UART1.any()
+        
+        if (data):
+            cls.buffer.extend(cls.UART1.read(data))
+        
+        headerIndex = cls.buffer.find(cls.FRAME_HEADER)
 
-        while (len(cls.buffer) >= 47):
-            if (cls.buffer[0] == 0x54):
-                frame = cls.buffer[:47]
-                cls.buffer = cls.buffer[47:]
+        if (headerIndex == -1):
+            if (len(cls.buffer) >= cls.FRAME_LENGTH):
+                cls.buffer = cls.buffer[-cls.FRAME_LENGTH:]  # 保留最后46字节，防止丢失帧头
 
-                return frame
-            else:
-                cls.buffer = cls.buffer[1:]
+            return None
+            
+        if (headerIndex > 0):
+            cls.buffer = cls.buffer[headerIndex:]  # 丢弃帧头前的数据
+
+        if (len(cls.buffer) >= cls.FRAME_LENGTH):
+            frame = cls.buffer[:cls.FRAME_LENGTH]
+            cls.buffer = cls.buffer[cls.FRAME_LENGTH:]  # 移除已处理的数据
+            return frame
+        
         return None
 
-    # 更新触碰计数
-    @classmethod
-    def updateTouchCount(cls, data):
-        if (cls.__getClosestDistance(data) <= cls.touchValidDistance):
-            cls.touchCount += 1
-        else:
-            cls.touchCount = 0
-
-        # 连续3次均小于200mm则认为是有效数据
-        if (cls.touchCount >= 3):
-            cls.touchCount = 0
-            MVHandler.currentTarget += 1
-            MVHandler.currentTarget = 1 if (MVHandler.currentTarget >= 4) else MVHandler.currentTarget
-    
     # 获取最近的测量距离
     @classmethod
-    def __getClosestDistance(cls, data):
-        rawData = list(data)
-        distanceList = []
+    def getClosestDistance(cls, data):
+        '''获取最近的测量距离'''
+        minDistance = float('inf')
 
-        for i in range(6, len(rawData) - 2, 3):
-            if (i + 1 >= len(rawData)): continue
+        for i in range(6, len(data) - 2, 3):
+            distance = data[i] + (data[i + 1] << 8)
 
-            distance = rawData[i] + (rawData[i + 1] << 8)
-            
-            distanceList.append(distance)
+            minDistance = min(minDistance, distance) if (distance >= cls.MIN_VALID_DISTANCE) else minDistance
 
-        return min(distanceList) if (distanceList) else float('inf')
+        return minDistance
