@@ -9,15 +9,15 @@ from core.SensorHandler import SensorHandler
 try:
     net = ml.Model(
         'trained.tflite', 
-        load_to_fb = uos.stat('trained.tflite')[6] > (gc.mem_free() - (64 * 1024)) # type: ignore
+        load_to_fb=uos.stat('trained.tflite')[6] > (gc.mem_free() - (64 * 1024)) # type: ignore
     )
 except Exception as e:
-    raise Exception("Failed to load 'trained.tflite': " + str(e))
+    raise Exception('Failed to load trained.tflite: ' + str(e))
 
 try:
     labels = [line.rstrip('\n') for line in open('labels.txt')]
 except Exception as e:
-    raise Exception("Failed to load 'labels.txt': " + str(e))
+    raise Exception('Failed to load labels.txt: ' + str(e))
 
 MotorHandler.motorInit() # 推进器初始化
 MVHandler.mvInit() # OpenMV初始化
@@ -68,7 +68,7 @@ while(True):
         image.draw_rectangle(MVHandler.maxBlob[0 : 4], color=(255, 0, 0))
         
         # 计算误差与PID输出
-        xError = image.width() / 2 - centerX
+        xError = image.width() // 2 - centerX
 
         # 计算PID输出
         xOutput = MotorHandler.xPid.get_pid(xError, 1)
