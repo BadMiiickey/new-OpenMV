@@ -8,12 +8,12 @@ class LEDHandler:
     }
 
     @classmethod
-    def toggleLED(cls, ledId: int):
+    def toggleLED(cls, ledId: int) -> None:
         '''LED闪烁'''
         LED(ledId).toggle()
 
     @classmethod
-    def showCurrentTarget(cls, currentTarget: int):
+    def showCurrentTarget(cls, currentTarget: int) -> None:
         '''通过LED显示当前识别目标'''
         if (currentTarget not in cls.LED_TARGET_CONFIG): return None
 

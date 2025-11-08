@@ -1,4 +1,4 @@
-import sensor, ml, uos, gc # type: ignore
+import sensor, ml, uos, gc, pyb, time # type: ignore
 
 from core.LEDHandler import LEDHandler
 from core.MVHandler import MVHandler
@@ -23,65 +23,90 @@ MotorHandler.motorInit() # 推进器初始化
 MVHandler.mvInit() # OpenMV初始化
 SensorHandler.sensorInit() # 激光传感器初始化
 
+isSwitching: bool = False
+lastNnUpdateTime: int = time.ticks_ms() # type: ignore
+
+NN_UPDATE_INTERVAL_MS: int = 200
+
 # 循环执行部分
 while(True):
-    gc.enable()
-
-    # 读取激光传感器数据
-    if (not SensorHandler.UART1.any()): continue
-
-    sensorData = SensorHandler.readFrame()
-
-    if (not sensorData): continue
+    LEDHandler.showCurrentTarget(MVHandler.currentTarget) # 编号[1] = 红色, [2] = 绿色, [3] = 蓝色
     
     # 获取基础数据
-    closestDistanceThisFrame = SensorHandler.getClosestDistance(sensorData)
-    image = sensor.snapshot()
-    result = net.predict([image])
+    SensorHandler.processBuffer()
 
-    if (not result or len(result) <= 0): continue
+    currentClosestDistance: float = float('inf')
+    sensorData: bytes | None = None
+    irqState = pyb.disable_irq()
+    lastFrame: bytes | None = SensorHandler.lastValidFrame
+    sensorData = lastFrame if (lastFrame) else None
 
-    # 状态更新与信息处理
-    MVHandler.resetMaxBlob()
-    MVHandler.autoAdjustExposure(image)
-    MVHandler.renderCurrentTarget(image)
-    MVHandler.renderCurrentBrightness(image)
-    LEDHandler.showCurrentTarget(MVHandler.currentTarget) # 编号[1] = 红色, [2] = 绿色, [3] = 蓝色
+    pyb.enable_irq(irqState)
 
-    # 目标检测
-    (scores, maxConfidence, gridX, gridY) = MVHandler.analyseResult(result)
-    (x, y, w, h, pixels, centerX, centerY, rotation) = MVHandler.getMaxBlob(image, scores, gridX, gridY)
-    MVHandler.maxBlob = [x, y, w, h, pixels, centerX, centerY, rotation]
+    if (sensorData):
+        currentClosestDistance = SensorHandler.getClosestDistance(sensorData)
+
+    if (isSwitching or time.ticks_diff(time.ticks_ms(), lastNnUpdateTime) >= NN_UPDATE_INTERVAL_MS): # type: ignore
+        lastNnUpdateTime = time.ticks_ms() # type: ignore
+
+        image = sensor.snapshot()
+        result = net.predict([image])
+
+        if (result and len(result) > 0):
+            # 状态更新与信息处理
+            MVHandler.autoAdjustExposure(image)
+            # MVHandler.renderCurrentTarget(image)
+            # MVHandler.renderCurrentBrightness(image)
+
+            # 目标检测
+            (scores, averageConfidence, averageX, averageY) = MVHandler.analyseResult(result)
+            MVHandler.maxBlob = MVHandler.getMaxBlob(image, scores, averageX, averageY, currentClosestDistance)
+            MVHandler.currentAverageConfidence = averageConfidence
+        else:
+            MVHandler.resetMaxBlob()
+            MVHandler.currentAverageConfidence = 0.0
+    
+    (_, _, _, _, pixels, centerX, _, _) = MVHandler.maxBlob
     MVHandler.maxSize = pixels
 
+    # MotorHandler.sendMaxConfidence(maxConfidence) # 发送最大置信度至STM32
+
+    print(f'Closest Distance: {currentClosestDistance} mm, \
+          Average Confidence: {MVHandler.currentAverageConfidence}, \
+          Max Size: {MVHandler.maxSize}')
     # 获取当前决策
-    action = MVHandler.updateTargetState(closestDistanceThisFrame, maxConfidence)
+    if (isSwitching):
+        MotorHandler.sendMotorCommand(670, 670)
+        action: str = 'ASYNC'
+    else:
+        action: str = MVHandler.updateTargetState(currentClosestDistance, MVHandler.currentAverageConfidence)
     
     # 执行当前决策
-    if (action == 'SWITCHED' or action == 'SEARCHING'):
-        MotorHandler.UART3.write('a755b715c')
+    if (action == 'SEARCHING'):
+        MotorHandler.sendMotorCommand(755, 725)
+
+    elif (action == 'MODIFYING'):
+        MotorHandler.sendMotorCommand(680, 680)
+
+    elif (action == 'SWITCHED'):
+        MVHandler.resetMaxBlob() # 切换目标后重置最大目标信息
+        isSwitching = True
+        MotorHandler.sendMotorCommand(690, 690)
 
     elif (action == 'TRACKING'):
-
         # 绘制识别结果
-        image.draw_circle((centerX, centerY, 12), color=MVHandler.CIRCLE_COLORS[MVHandler.currentTarget], thickness=2)
-        image.draw_rectangle(MVHandler.maxBlob[0 : 4], color=(255, 0, 0))
+        # image.draw_circle((centerX, centerY, 12), color=MVHandler.CIRCLE_COLORS[MVHandler.currentTarget], thickness=2)
+        # image.draw_rectangle(MVHandler.maxBlob[0 : 4], color=(255, 0, 0))
         
         # 计算误差与PID输出
-        xError = image.width() // 2 - centerX
+        xError: float = image.width() // 2 - centerX # type: ignore
 
         # 计算PID输出
-        xOutput = MotorHandler.xPid.get_pid(xError, 1)
-        hOutput = MotorHandler.CRUISE_SPEED if (closestDistanceThisFrame > MotorHandler.BRAKE_DISTANCE) else -50
+        x: float = MotorHandler.getXOutput(xError, MVHandler.maxSize)
+        h: int = MotorHandler.getHOutput(currentClosestDistance)
 
         # 计算左右轮输出
-        leftOut = max(-500, min(500, hOutput + xOutput))
-        rightOut = max(-500, min(500, hOutput - xOutput))
+        left: int = MotorHandler.getLeftOutput(h, x)
+        right: int = MotorHandler.getRightOutput(h, x)
 
-        # 线性映射输出到电机
-        mappedA = MotorHandler.linearMap(leftOut, -500, 500, 5, 10)
-        mappedB = MotorHandler.linearMap(rightOut, -500, 500, 5, 10)
-
-        MotorHandler.UART3.write(f'a{mappedA:03d}b{mappedB:03d}c')
-
-    gc.collect()
+        MotorHandler.sendMotorCommand(left, right)
