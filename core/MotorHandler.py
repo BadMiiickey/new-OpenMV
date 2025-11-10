@@ -2,44 +2,36 @@ from pyb import UART # type: ignore
 from pid import PID # type: ignore
 
 class MotorHandler:
-    UART3 = UART(3, 115200)
-    
-    CRUISE_SPEED: int = 180 # 巡航速度
-    STOP_DISTANCE: int = 250 # 期望停下的距离(单位mm)
+    __UART3 = UART(3, 115200)
+    __CRUISE_SPEED: int = 180 # 巡航速度
 
-    BASE_SIZE: int = 400 # 基准目标像素面积
-    MIN_SCALE: float = 0.3  # 近距离时，最小缩放为0.3倍，防止抖动
-    MAX_SCALE: float = 1.2  # 远距离时，最大放大为1.2倍，增强转向
-
-    # 转向PID参数
-    xPid = PID(0.18, 0, 0)
+    __xPid = PID(0.22, 0, 0) # 转向PID参数
 
     @classmethod
     def motorInit(cls) -> None:
         '''初始化推进器'''
-        cls.UART3.init(115200, 8, None, 1)
+        cls.__UART3.init(115200, 8, None, 1)
 
     @classmethod
-    def getXOutput(cls, xError: float, currentMaxSize: int) -> float:
+    def getXOutput(cls, xError: float) -> float:
         '''根据x轴误差获取转向输出'''
-        pidOutput: float = cls.xPid.get_pid(xError, 1)
-        scaleFactor: float = cls.BASE_SIZE / currentMaxSize if (currentMaxSize > 0) else cls.MAX_SCALE
-        clampedScaleFactor: float = max(cls.MIN_SCALE, min(cls.MAX_SCALE, scaleFactor))
-
-        return pidOutput * clampedScaleFactor
+        return cls.__xPid.get_pid(xError, 1)
 
     @classmethod
     def getHOutput(cls, distance: float) -> int:
         '''根据距离获取前进速度'''
-        if (distance > cls.STOP_DISTANCE):
-            return cls.CRUISE_SPEED
-        else:
-            return -cls.CRUISE_SPEED - int((cls.STOP_DISTANCE - distance) * 0.5)
-        
+        STOP_DISTANCE: int = 250 # 期望停下的距离(单位mm)
+        SLOW_DOWN_DISTANCE: int = 500 # 开始减速的距离(单位mm)
+
+        speed = cls.__linearMap(distance, STOP_DISTANCE, SLOW_DOWN_DISTANCE, -cls.__CRUISE_SPEED, cls.__CRUISE_SPEED)
+        clampedSpeed = max(-cls.__CRUISE_SPEED, min(cls.__CRUISE_SPEED, speed))
+
+        return clampedSpeed
+
     @classmethod
     def getLeftOutput(cls, currentSpeed: float, x: float) -> int:
         '''根据当前速度和转向输出获取左轮输出'''
-        rawOut: float = max(-cls.CRUISE_SPEED, min(500, currentSpeed + x))
+        rawOut: float = max(-cls.__CRUISE_SPEED, min(500, currentSpeed + x))
         left: float = cls.__linearMap(rawOut, -500, 500, 5, 10)
 
         return left
@@ -47,7 +39,7 @@ class MotorHandler:
     @classmethod
     def getRightOutput(cls, currentSpeed: float, x: float) -> int:
         '''根据当前速度和转向输出获取右轮输出'''
-        rawOut: float = max(-cls.CRUISE_SPEED, min(500, currentSpeed - x))
+        rawOut: float = max(-cls.__CRUISE_SPEED, min(500, currentSpeed - x))
         right: float = cls.__linearMap(rawOut, -500, 500, 5, 10)
 
         return right
@@ -56,7 +48,7 @@ class MotorHandler:
     def sendMotorCommand(cls, left: int, right: int) -> None:
         '''发送电机驱动占空比至STM32'''        
         command: str = f'A0B{left:03d}{right:03d}C'
-        cls.UART3.write(command)
+        cls.__UART3.write(command)
 
     @classmethod
     def sendMaxConfidence(cls, value: float) -> None:
@@ -64,7 +56,7 @@ class MotorHandler:
         valueInTenths: int = int(round(value * 100))
         valueInTenths = max(0, min(999, valueInTenths))
 
-        cls.UART3.write(f'A1Bconfidence!{valueInTenths:03d}C')
+        cls.__UART3.write(f'A1Bconfidence!{valueInTenths:03d}C')
 
     @staticmethod
     def __linearMap(x: float, inMin: int, inMax: int, outMin: int, outMax: int) -> int:
