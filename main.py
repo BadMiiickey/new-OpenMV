@@ -26,7 +26,8 @@ SensorHandler.sensorInit() # 激光传感器初始化
 lastNnUpdateTime: int = time.ticks_ms() # type: ignore
 lastAction: str = 'SEARCHING'
 
-NN_UPDATE_INTERVAL_MS: int = 200
+NN_UPDATE_INTERVAL_MS: int = 200 # 神经网络处理间隔时间(单位ms)
+X_MODE_CHANGE_DISTANCE: int = 400 # 转向x坐标采样模式切换距离(单位mm)
 
 # 循环执行部分
 while (True):
@@ -56,13 +57,10 @@ while (True):
     lastNnUpdateTime = time.ticks_ms() # 更新上次神经网络处理时间 # type: ignore 
 
     if (result and len(result) > 0):
+        MVHandler.autoAdjustExposure(image, MVHandler.maxBlob[0:4]) # 自动曝光调整
 
-        # 状态更新与信息处理
-        MVHandler.autoAdjustExposure(image)
-
-        # 目标检测
-        (peakConfidence, averageX) = MVHandler.analyseResult(result)
-        MVHandler.currentAverageConfidence = peakConfidence
+        (peakConfidence, averageX) = MVHandler.analyseResult(result) # 分析神经网络输出结果
+        MVHandler.currentAverageConfidence = peakConfidence # 更新当前平均置信度
 
         if (currentClosestDistance < MVHandler.TOUCH_VALID_DISTANCE):
             MVHandler.maxBlob = MVHandler.getMaxBlob(image)
@@ -72,7 +70,7 @@ while (True):
 
     # 4. <- 同步状态并做出决策 -> #
     (_, _, _, _, pixels, _, _, _) = MVHandler.maxBlob
-    MVHandler.maxSize = pixels
+    MVHandler.maxSize = pixels # 更新当前最大目标面积
 
     action: str = MVHandler.updateTargetState(currentClosestDistance, MVHandler.currentAverageConfidence)
 
@@ -94,7 +92,7 @@ while (True):
 
         # 绘制识别结果
         # image.draw_rectangle(MVHandler.maxBlob[0 : 4], color=(255, 0, 0))
-
+        
         xError: float = image.width() // 2 - averageX # type: ignore
         x: float = MotorHandler.getXOutput(xError)
         h: int = MotorHandler.getHOutput(currentClosestDistance)

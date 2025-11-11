@@ -8,7 +8,6 @@ class SensorHandler:
     __MIN_VALID_DISTANCE: int = 120 # 最小有效距离(mm)
 
     __buffer: bytearray = bytearray()
-    __lastValidDistance: float | int = float('inf')
 
     @classmethod
     def sensorInit(cls) -> None:
@@ -30,11 +29,8 @@ class SensorHandler:
 
             minDistance = min(minDistance, distance)
 
-        if (minDistance == float('inf')):
-            minDistance = cls.__lastValidDistance
-        else:
-            cls.__lastValidDistance = minDistance
-
+        if (minDistance == float('inf')): return float('inf')
+                        
         return minDistance
     
     @classmethod

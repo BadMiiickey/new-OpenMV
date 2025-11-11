@@ -3,7 +3,7 @@ from pid import PID # type: ignore
 
 class MotorHandler:
     __UART3 = UART(3, 115200)
-    __CRUISE_SPEED: int = 180 # 巡航速度
+    __CRUISE_SPEED: int = 190 # 巡航速度
 
     __xPid = PID(0.22, 0, 0) # 转向PID参数
 
@@ -20,26 +20,26 @@ class MotorHandler:
     @classmethod
     def getHOutput(cls, distance: float) -> int:
         '''根据距离获取前进速度'''
-        STOP_DISTANCE: int = 250 # 期望停下的距离(单位mm)
-        SLOW_DOWN_DISTANCE: int = 500 # 开始减速的距离(单位mm)
+        STOP_DISTANCE: int = 700 # 期望停下的距离(单位mm)
+        BRAKE_SPEED: int = -80 # 停止时的速度(负值表示倒退)
 
-        speed = cls.__linearMap(distance, STOP_DISTANCE, SLOW_DOWN_DISTANCE, -cls.__CRUISE_SPEED, cls.__CRUISE_SPEED)
-        clampedSpeed = max(-cls.__CRUISE_SPEED, min(cls.__CRUISE_SPEED, speed))
-
-        return clampedSpeed
+        if (distance > STOP_DISTANCE or distance == float('inf')):
+            return cls.__CRUISE_SPEED
+        else:
+            return BRAKE_SPEED
 
     @classmethod
-    def getLeftOutput(cls, currentSpeed: float, x: float) -> int:
+    def getLeftOutput(cls, h: float, x: float) -> int:
         '''根据当前速度和转向输出获取左轮输出'''
-        rawOut: float = max(-cls.__CRUISE_SPEED, min(500, currentSpeed + x))
+        rawOut: float = max(-cls.__CRUISE_SPEED, min(500, h + x))
         left: float = cls.__linearMap(rawOut, -500, 500, 5, 10)
 
         return left
     
     @classmethod
-    def getRightOutput(cls, currentSpeed: float, x: float) -> int:
+    def getRightOutput(cls, h: float, x: float) -> int:
         '''根据当前速度和转向输出获取右轮输出'''
-        rawOut: float = max(-cls.__CRUISE_SPEED, min(500, currentSpeed - x))
+        rawOut: float = max(-cls.__CRUISE_SPEED, min(500, h - x))
         right: float = cls.__linearMap(rawOut, -500, 500, 5, 10)
 
         return right

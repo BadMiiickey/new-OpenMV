@@ -41,18 +41,21 @@ class MVHandler:
         cls.__imageHeight = firstImage.height()
 
     @classmethod
-    def autoAdjustExposure(cls, image) -> None:
+    def autoAdjustExposure(cls, image, roi: tuple[int, int, int, int]) -> None:
         '''自动调整曝光时间'''
         LIGHT_MIN: int = 40 # 光线最小值, 低于此值则认为光线不足
         LIGHT_MAX: int = 42 # 光线最大值, 高于此值则认为光线过强
         GAIN: int = 10 # 曝光调整系数
         EXPOSURE_MIN: int = 10 # 最小曝光时间, 单位微秒
         EXPOSURE_MAX: int = 50000 # 最大曝光时间, 单位微秒
-        ROI_SIZE: int = 80 # 计算亮度的ROI区域大小
+        DEFAULT_ROI_SIZE: int = 80 # 计算亮度的ROI区域大小
 
-        roiX: int = (cls.__imageWidth - ROI_SIZE) // 2
-        roiY: int = (cls.__imageHeight - ROI_SIZE) // 2
-        centerRoi: tuple[int, int, int, int] = (roiX, roiY, ROI_SIZE, ROI_SIZE)
+        if (not roi or roi[2] <= 0 or roi[3] <= 0):
+            roiX: int = (cls.__imageWidth - DEFAULT_ROI_SIZE) // 2
+            roiY: int = (cls.__imageHeight - DEFAULT_ROI_SIZE) // 2
+            centerRoi: tuple[int, int, int, int] = (roiX, roiY, DEFAULT_ROI_SIZE, DEFAULT_ROI_SIZE)
+        else:
+            centerRoi = roi
 
         stats = image.get_statistics(roi=centerRoi)
         cls.__currentBrightness = stats.l_mean() # 获取亮度
