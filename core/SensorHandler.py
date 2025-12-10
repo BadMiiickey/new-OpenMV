@@ -5,7 +5,7 @@ class SensorHandler:
     
     __UART1 = UART(1, 921600) # P0(RX), P1(TX)
     __FRAME_LENGTH: int = 47 # 帧长度
-    __MIN_VALID_DISTANCE: int = 120 # 最小有效距离(mm)
+    __MIN_VALID_DISTANCE: int = 160 # 最小有效距离(mm)
 
     __buffer: bytearray = bytearray()
 
@@ -24,7 +24,7 @@ class SensorHandler:
             low = data[index]
             high = data[index + 1]
             distance: float = (high << 8) | low
-
+            
             if (distance <= cls.__MIN_VALID_DISTANCE): continue
 
             minDistance = min(minDistance, distance)

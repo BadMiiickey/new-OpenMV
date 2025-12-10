@@ -23,10 +23,6 @@ MotorHandler.motorInit() # 推进器初始化
 MVHandler.mvInit() # OpenMV初始化
 SensorHandler.sensorInit() # 激光传感器初始化
 
-lastNnUpdateTime: int = time.ticks_ms() # type: ignore
-lastAction: str = 'SEARCHING'
-
-NN_UPDATE_INTERVAL_MS: int = 200 # 神经网络处理间隔时间(单位ms)
 X_MODE_CHANGE_DISTANCE: int = 400 # 转向x坐标采样模式切换距离(单位mm)
 
 # 循环执行部分
@@ -39,8 +35,7 @@ while (True):
     SensorHandler.processBuffer()
 
     currentClosestDistance: float = float('inf')
-    sensorData: bytes | None = None
-    irqState = pyb.disable_irq()
+    irqState: int = pyb.disable_irq()
     lastFrame: bytes | None = SensorHandler.lastValidFrame
 
     pyb.enable_irq(irqState)
@@ -49,15 +44,12 @@ while (True):
         currentClosestDistance = SensorHandler.getClosestDistance(lastFrame)
 
     # 3. <- 神经网络处理与决策 -> #
-    if (time.ticks_diff(time.ticks_ms(), lastNnUpdateTime) < NN_UPDATE_INTERVAL_MS): continue # type: ignore
-
-    image = sensor.snapshot() # 获取当前帧的图像
-    result = net.predict([image]) # 进行神经网络预测
+    image: sensor.image = sensor.snapshot() # 获取当前帧的图像
+    result: list = net.predict([image]) # 进行神经网络预测
     averageX: int = image.width() // 2 # 加权平均后的目标x坐标, 默认为图像中心
-    lastNnUpdateTime = time.ticks_ms() # 更新上次神经网络处理时间 # type: ignore 
 
     if (result and len(result) > 0):
-        MVHandler.autoAdjustExposure(image, MVHandler.maxBlob[0:4]) # 自动曝光调整
+        # MVHandler.autoAdjustExposure(image, MVHandler.maxBlob[0:4]) # 自动曝光调整
 
         (peakConfidence, averageX) = MVHandler.analyseResult(result) # 分析神经网络输出结果
         MVHandler.currentAverageConfidence = peakConfidence # 更新当前平均置信度
@@ -75,14 +67,11 @@ while (True):
     action: str = MVHandler.updateTargetState(currentClosestDistance, MVHandler.currentAverageConfidence)
 
     # 5. <- 执行决策 -> #
-    if (action == 'TRACKING' and lastAction == 'SEARCHING'):
-        MotorHandler.sendMotorCommand(725, 765)
-
-    elif (action == 'SEARCHING'):
+    if (action == 'SEARCHING'):
         MotorHandler.sendMotorCommand(755, 725)
 
-    elif (action == 'MODIFYING'):
-        MotorHandler.sendMotorCommand(680, 680)
+    # elif (action == 'MODIFYING'):
+    #     MotorHandler.sendMotorCommand(680, 680) # 室内可用
 
     elif (action == 'SWITCHED'):
         MotorHandler.sendMotorCommand(690, 690)
@@ -91,17 +80,15 @@ while (True):
     elif (action == 'TRACKING'):
 
         # 绘制识别结果
-        # image.draw_rectangle(MVHandler.maxBlob[0 : 4], color=(255, 0, 0))
+        # image.draw_rectangle(MVHandler.maxBlob[0:4], color=(255, 0, 0))
         
         xError: float = image.width() // 2 - averageX # type: ignore
         x: float = MotorHandler.getXOutput(xError)
-        h: int = MotorHandler.getHOutput(currentClosestDistance)
+        h: int = 180
         left: int = MotorHandler.getLeftOutput(h, x)
         right: int = MotorHandler.getRightOutput(h, x)
 
         MotorHandler.sendMotorCommand(left, right)
-
-    lastAction = action
 
     # print(
     #     f'Action: {action:<10} | '
@@ -109,7 +96,6 @@ while (True):
     #     f'Distance: {currentClosestDistance:<4.0f} | '
     #     f'Confidence: {MVHandler.currentAverageConfidence:<4.2f} | '
     #     f'Size: {MVHandler.maxSize:<5} | '
-    #     f'Failures: {MVHandler.consecutiveNnFailures}'
     # )
 
     # MotorHandler.sendMaxConfidence(MVHandler.currentAverageConfidence)

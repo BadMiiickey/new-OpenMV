@@ -18,17 +18,6 @@ class MotorHandler:
         return cls.__xPid.get_pid(xError, 1)
 
     @classmethod
-    def getHOutput(cls, distance: float) -> int:
-        '''根据距离获取前进速度'''
-        STOP_DISTANCE: int = 700 # 期望停下的距离(单位mm)
-        BRAKE_SPEED: int = -80 # 停止时的速度(负值表示倒退)
-
-        if (distance > STOP_DISTANCE or distance == float('inf')):
-            return cls.__CRUISE_SPEED
-        else:
-            return BRAKE_SPEED
-
-    @classmethod
     def getLeftOutput(cls, h: float, x: float) -> int:
         '''根据当前速度和转向输出获取左轮输出'''
         rawOut: float = max(-cls.__CRUISE_SPEED, min(500, h + x))
